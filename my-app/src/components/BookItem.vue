@@ -1,6 +1,6 @@
 <template>
 <div>
-    <p><emp>{{title}}</emp></p>
+    <p><emp>{{title}} - {{title}}</emp></p>
 </div>
 </template>
 
