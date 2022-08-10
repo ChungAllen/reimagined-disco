@@ -1,13 +1,25 @@
 <template>
   <div id="app">
     <img alt="Vue logo" src="./assets/logo.png">
-      <h1>TO DO  LIST</h1>
+      <h1>TO DO LIST</h1>
       <to-do-form @task-added="AppendList"></to-do-form>
-      <ul class="stack-large">
-        <to-do-item v-for="(item, index) in ToDoItems" :key="index" :label="item.label" :done="item.done" :id="'tododod-' + index"></to-do-item>
+      <h2>Book list from local</h2>
+      <book-item v-for="book in books" :key="book.id" :title="book.title" />
+      <button type="submit" class="btn btn__primary btn__lg" @click="addBook">Add Book</button>
+      <h2>{{listSummary}}</h2>
+      <ul aria-labelledby="list-summary" class="stack-large">
+        <li v-for="(item, index) in ToDoItems" :key="index">
+           <to-do-item :label="item.label" :done="item.done" :id="item.id" 
+              @checkbox-change="updateDoneStatus(item.id)"
+              @item-deleted="deleteToDo(item.id)"
+              @item-changed="editToDo(item.id, $event)"></to-do-item>
+        </li>
+       
       </ul>
       
     <!-- <HelloWorld  msg="Welcome to Your Vue.js App"/> -->
+    <h2>smart quotes here; total {{totalQuotes}}</h2>
+    <quote-item v-for="(quote, index) in smartQuotes" :key="'quote-' + index" :quote="quote.quote" :author="quote.author"/>
   </div>
 </template>
 
@@ -16,13 +28,18 @@
 import ToDoItem from './components/ToDoItem.vue';
 import ToDoForm from './components/ToDoForm.vue';
 import uniqueId from 'lodash.uniqueid';
+import QuoteItem from './components/QuoteItem.vue';
+import BookItem from './components/BookItem.vue';
+import $ from 'jquery';
 
 export default {
   name: 'App',
   components: {
     // HelloWorld,
     ToDoItem,
-    ToDoForm
+    ToDoForm,
+    QuoteItem,
+    BookItem,
   },
   data() {
     return {
@@ -31,19 +48,121 @@ export default {
         { id: uniqueId('todo-'), label: 'Create a Vue project with the CLI', done: true },
         { id: uniqueId('todo-'), label: 'Have fun', done: true },
         { id: uniqueId('todo-'), label: 'Create a to-do list', done: false }
-      ]     
+      ], 
+      smartQuotes: new Array(),
+      totalQuotes : {
+        type: Number
+      },
+      errorMessgae: '',
+      currentPage: 1,
+      books: new Array(),
     };
   },
+  computed: {
+    listSummary() {
+      const numberFinishedItems = this.ToDoItems.filter((item) =>item.done).length
+      return `${numberFinishedItems} out of ${this.ToDoItems.length} items completed`;
+    }
+  },
   methods: {
+    addBook() {
+      let postAPI = `http://localhost:8080/api/add/book`;
+      let newBook = {
+        title: 'post new book'
+      };
+      fetch(postAPI, {
+        method: 'POST', // *GET, POST, PUT, DELETE, etc.
+        mode: 'cors', // no-cors, *cors, same-origin
+        cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
+        credentials: 'same-origin', // include, *same-origin, omit
+        headers: {
+          'Content-Type': 'application/json'
+          // 'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        redirect: 'follow', // manual, *follow, error
+        referrerPolicy: 'no-referrer', // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
+        body: JSON.stringify(newBook)
+        })
+        .then(response => console.log(response))
+        .catch((error) => {
+          console.log(error)
+        })
+    },
     AppendList (newtask) {
       this.ToDoItems.push({
         id: uniqueId('todo-'),
         label: newtask,
         done: false
       });
-    }
+    },
+    updateDoneStatus(toDoId) {
+      let updateTarget = this.ToDoItems.find(e => e.id === toDoId);
+      updateTarget.done = !updateTarget.done;
+    },
+    deleteToDo(toDoId) {
+      const itemIndex = this.ToDoItems.findIndex((item) => item.id === toDoId);
+      this.ToDoItems.splice(itemIndex, 1);
+    },
+    editToDo(toDoId, newLabel) {
+      const toDoToEdit = this.ToDoItems.find((item) => item.id === toDoId);
+      toDoToEdit.label = newLabel;
+    },
+    nextPage() {
+      const {
+          scrollTop,
+          scrollHeight,
+          clientHeight
+      } = document.documentElement;
+
+      if (scrollTop + clientHeight >= scrollHeight - 5 ) {
+        let APIUrl = `https://api.javascripttutorial.net/v1/quotes/?page=` + this.currentPage + `&limit=10`;
+  
+        fetch(APIUrl)
+          .then(response => response.json())
+          .then( data => {
+            this.currentPage = this.currentPage +1;
+            this.smartQuotes = this.smartQuotes.concat(data.data)
+          });
+      }
+    },
+  },
+  mounted() {
+    
+    let APIUrl = `https://api.javascripttutorial.net/v1/quotes/`;
+    let localAPI = `http://localhost:8080/api/books`;
+
+    console.log('mounted', APIUrl, localAPI );
+
+    fetch(APIUrl)
+      .then( response => response.json())
+      .then( data => {
+        this.totalQuotes = data.total;
+        this.smartQuotes = this.smartQuotes.concat(data.data);
+      }).catch((error) => {
+        console.log(error)
+      });
+
+      $.ajax({
+        url: localAPI
+      }).done( data => {
+          this.books = this.books.concat(data.data);
+          console.log('books', this.books)
+      });
+
+      // fetch(localAPI)
+      //   .then(response => response.json())
+      //   .then((data) => {
+      //     this.books = this.books.concat(data.data);
+      //     console.log('books', this.books)
+      //   } )
+      //   .catch((error) => {
+      //     console.log(error)
+      //   })
+
+    window.addEventListener('scroll', this.nextPage);
   }
 }
+
 </script>
 
 <style>
